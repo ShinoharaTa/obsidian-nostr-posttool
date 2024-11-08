@@ -1,8 +1,9 @@
 import { Plugin, Notice } from 'obsidian';
-import { SimplePool } from "nostr-tools";
+import { finishEvent, getEventHash, getPublicKey, nip19, SimplePool } from "nostr-tools";
 import type { Filter, Event } from "nostr-tools";
 import 'websocket-polyfill';
 import { NostrSettingsTab } from 'settings';
+import { NostrPostModal } from './modal';
 
 interface NostrClientSettings {
     relays: string[];
@@ -37,6 +38,19 @@ export default class NostrClientPlugin extends Plugin {
 			}
 		}
         this.pool = new SimplePool();
+
+        // コマンドの追加
+        this.addCommand({
+            id: 'create-nostr-post',
+            name: 'Create New Nostr Post',
+            callback: () => {
+                if (!this.currentNsec) {
+                    new Notice('Please set your Nostr secret key in settings first.');
+                    return;
+                }
+                this.showPostModal();
+            }
+        });
 		this.addSettingTab(new NostrSettingsTab(this.app, this));
 
         // プラグインが有効化されたときにNostrの監視を開始
@@ -46,6 +60,12 @@ export default class NostrClientPlugin extends Plugin {
         this.register(() => {
             this.pool.close(this.settings.relays);
         });
+    }
+    // 投稿モーダルを表示
+    showPostModal() {
+        new NostrPostModal(this.app, async (content: string) => {
+            await this.createNostrPost(content);
+        }).open();
     }
 
     async loadSettings() {
@@ -223,4 +243,29 @@ export default class NostrClientPlugin extends Plugin {
 	getNsec(): string {
 		return this.currentNsec;
 	}
+
+    // Nostrへの投稿を作成
+    async createNostrPost(content: string) {
+        try {
+            if (!this.currentNsec) {
+                throw new Error('No secret key set');
+            }
+			const hex = nip19.decode(this.currentNsec)
+			if(hex.type !== "nsec"){
+				throw new Error("失敗");
+			}
+            // イベントの作成
+            const event = {
+                kind: 1,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [],
+                content: content
+            };
+			const post = finishEvent(event, hex.data)
+            this.pool.publish(this.settings.relays, post);
+		} catch (error) {
+            console.error('Failed to create Nostr post:', error);
+            new Notice('Failed to create post: ' + (error as Error).message);
+        }
+    }
 }
