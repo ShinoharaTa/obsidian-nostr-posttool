@@ -1,5 +1,5 @@
 import { PluginSettingTab, Setting } from 'obsidian';
-import type { App } from 'obsidian';
+import type { App, TextAreaComponent } from 'obsidian';
 import type NostrClientPlugin from './main';
 
 export class NostrSettingsTab extends PluginSettingTab {
@@ -20,10 +20,20 @@ export class NostrSettingsTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('Relays')
             .setDesc('監視するNostrリレー（1行に1つ）')
-            .addTextArea(text => text
-                .setPlaceholder('wss://relay.example.com')
-                .setValue(this.plugin.settings.relays.join('\n'))
-                .onChange(async (value) => {
+            .addTextArea(text => {
+                // TextAreaのスタイル調整
+                const textArea = (text as TextAreaComponent)
+                    .setPlaceholder('wss://relay.example.com')
+                    .setValue(this.plugin.settings.relays.join('\n'));
+                
+                // TextAreaの要素を直接スタイリング
+                const textAreaEl = textArea.inputEl;
+                textAreaEl.style.width = '100%';
+                textAreaEl.style.minWidth = '300px';
+                textAreaEl.style.height = '100px'; // 約10行分
+                textAreaEl.style.fontFamily = 'monospace';
+                
+                text.onChange(async (value) => {
                     this.plugin.settings.relays = value
                         .split('\n')
                         .map(relay => relay.trim())
@@ -31,23 +41,40 @@ export class NostrSettingsTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     
                     // リレーの設定が変更されたら監視を再起動
+                    // this.plugin.stopMonitoring();
                     this.plugin.startMonitoring();
-                }));
+                });
+
+                return text;
+            });
 
         // 検索パターンの設定
         new Setting(containerEl)
             .setName('Search Pattern')
             .setDesc('監視するテキストパターン（正規表現）')
-            .addText(text => text
-                .setPlaceholder('テスト')
-                .setValue(this.plugin.settings.searchPattern.source)
-                .onChange(async (value) => {
+            .addText(text => {
+                const textEl = text
+                    .setPlaceholder('テスト')
+                    .setValue(this.plugin.settings.searchPattern.source);
+
+                // テキスト入力欄のスタイル調整
+                textEl.inputEl.style.width = '100%';
+                textEl.inputEl.style.minWidth = '300px';
+                textEl.inputEl.style.fontFamily = 'monospace';
+                text.onChange(async (value) => {
                     try {
                         this.plugin.settings.searchPattern = new RegExp(value);
                         await this.plugin.saveSettings();
+                        // 正規表現が正しい場合、入力欄を通常の状態に
+                        textEl.inputEl.style.backgroundColor = '';
                     } catch (error) {
                         console.error('Invalid regular expression:', error);
+                        // 正規表現が不正な場合、入力欄を赤く
+                        textEl.inputEl.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
                     }
-                }));
-    }
+                });
+
+                return text;
+            });
+        }
 }
