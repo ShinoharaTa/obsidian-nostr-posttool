@@ -16,6 +16,49 @@ export class NostrSettingsTab extends PluginSettingTab {
 
         containerEl.createEl('h2', { text: 'Nostr Client Settings' });
 
+        // 秘密鍵の設定
+        const secretKeySetting = new Setting(containerEl)
+            .setName('Nostr Secret Key')
+            .setDesc('Nostrの秘密鍵（nsec）を入力してください。この値は暗号化して保存されます。')
+            .addText(text => {
+                text.setPlaceholder('nsec1...')
+                    .setValue(this.plugin.getNsec())
+                    .inputEl.type = 'password';
+
+                // スタイル調整
+                text.inputEl.style.width = '100%';
+                text.inputEl.style.minWidth = '300px';
+                text.inputEl.style.fontFamily = 'monospace';
+
+                // 入力値の検証とマスク処理
+                text.onChange(async (value) => {
+                    if (value.startsWith('nsec1') || value === '') {
+                        const success = await this.plugin.setNsec(value);
+                        if (success) {
+                            text.inputEl.style.backgroundColor = '';
+                        }
+                    } else {
+                        text.inputEl.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+                    }
+                });
+
+                return text;
+            });
+
+        // 表示/非表示切り替えボタンを追加
+        secretKeySetting.addButton(button => {
+            return button
+                .setIcon('eye')
+                .setTooltip('Show/Hide Secret Key')
+                .onClick(() => {
+                    const inputEl = secretKeySetting.controlEl.querySelector('input');
+                    if (inputEl) {
+                        inputEl.type = inputEl.type === 'password' ? 'text' : 'password';
+                        button.setIcon(inputEl.type === 'password' ? 'eye' : 'eye-off');
+                    }
+                });
+        });
+
         // リレーの設定
         new Setting(containerEl)
             .setName('Relays')
@@ -55,7 +98,7 @@ export class NostrSettingsTab extends PluginSettingTab {
             .addText(text => {
                 const textEl = text
                     .setPlaceholder('テスト')
-                    .setValue(this.plugin.settings.searchPattern.source);
+                    .setValue(this.plugin.settings.searchPattern);
 
                 // テキスト入力欄のスタイル調整
                 textEl.inputEl.style.width = '100%';
@@ -63,10 +106,10 @@ export class NostrSettingsTab extends PluginSettingTab {
                 textEl.inputEl.style.fontFamily = 'monospace';
                 text.onChange(async (value) => {
                     try {
-                        this.plugin.settings.searchPattern = new RegExp(value);
+                        new RegExp(value);
+                        this.plugin.settings.searchPattern = value;
                         await this.plugin.saveSettings();
-                        // 正規表現が正しい場合、入力欄を通常の状態に
-                        textEl.inputEl.style.backgroundColor = '';
+                        text.inputEl.style.backgroundColor = '';
                     } catch (error) {
                         console.error('Invalid regular expression:', error);
                         // 正規表現が不正な場合、入力欄を赤く

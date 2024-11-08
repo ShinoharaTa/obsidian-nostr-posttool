@@ -6,7 +6,8 @@ import { NostrSettingsTab } from 'settings';
 
 interface NostrClientSettings {
     relays: string[];
-    searchPattern: RegExp;
+    searchPattern: string;
+	encryptedNsec?: string;
 }
 
 const DEFAULT_SETTINGS: NostrClientSettings = {
@@ -15,15 +16,26 @@ const DEFAULT_SETTINGS: NostrClientSettings = {
         'wss://yabu.me',
         'wss://relay-jp.shino3.net',
     ],
-    searchPattern: /ちんちん/
+    searchPattern: "ちんちん",
+	encryptedNsec: undefined
 };
 
 export default class NostrClientPlugin extends Plugin {
     settings: NostrClientSettings;
     pool: SimplePool;
+	currentNsec = ''; // 復号化された現在の秘密鍵
 
-    async onload() {
+	async onload() {
         await this.loadSettings();
+		// 秘密鍵の復号化
+		if (this.settings.encryptedNsec) {
+			try {
+				this.currentNsec = await this.decryptNsec(this.settings.encryptedNsec);
+			} catch (error) {
+				console.error('Failed to decrypt nsec:', error);
+				this.currentNsec = '';
+			}
+		}
         this.pool = new SimplePool();
 		this.addSettingTab(new NostrSettingsTab(this.app, this));
 
@@ -37,11 +49,20 @@ export default class NostrClientPlugin extends Plugin {
     }
 
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    }
+        const settings =  await this.loadData();
+		console.log(settings);
+        this.settings = {
+            relays: settings?.relays || DEFAULT_SETTINGS.relays,
+            searchPattern: settings?.searchPattern || DEFAULT_SETTINGS.searchPattern,
+            encryptedNsec: settings?.encryptedNsec
+        };
+        console.log('Settings loaded:', { ...this.settings, encryptedNsec: '***' });
+	}
 
     async saveSettings() {
         await this.saveData(this.settings);
+		console.log('Settings saved:', { ...this.settings, encryptedNsec: '***' });
+
     }
 
     startMonitoring() {
@@ -69,7 +90,8 @@ export default class NostrClientPlugin extends Plugin {
             const content = event.content;
 
             // 「テスト」という単語が含まれているかチェック
-            if (this.settings.searchPattern.test(content)) {
+			const regexp = new RegExp(this.settings.searchPattern)
+            if (regexp.test(content)) {
                 // 投稿者の公開鍵を短縮形式で表示
                 const authorShort = `${event.pubkey.substring(0, 6)}...`;
 
@@ -87,4 +109,118 @@ export default class NostrClientPlugin extends Plugin {
             console.error('イベント処理中にエラーが発生しました:', error);
         }
     }
+
+	// 秘密鍵の暗号化
+	async encryptNsec(nsec: string): Promise<string> {
+		const encoder = new TextEncoder();
+		const data = encoder.encode(nsec);
+
+		// ランダムな初期化ベクトル（IV）を生成
+		const iv = crypto.getRandomValues(new Uint8Array(12));
+
+		// 暗号化キーを生成（この例ではデバイスIDを使用）
+		const keyMaterial = await crypto.subtle.importKey(
+			'raw',
+			encoder.encode("meow"),
+			'PBKDF2',
+			false,
+			['deriveBits', 'deriveKey']
+		);
+
+		const key = await crypto.subtle.deriveKey(
+			{
+				name: 'PBKDF2',
+				salt: encoder.encode('nostr-monitor-salt'),
+				iterations: 100000,
+				hash: 'SHA-256'
+			},
+			keyMaterial,
+			{ name: 'AES-GCM', length: 256 },
+			false,
+			['encrypt', 'decrypt']
+		);
+
+		const encryptedData = await crypto.subtle.encrypt(
+			{
+				name: 'AES-GCM',
+				iv: iv
+			},
+			key,
+			data
+		);
+
+		// IV と暗号化データを結合して Base64 エンコード
+		const encryptedArray = new Uint8Array(iv.length + encryptedData.byteLength);
+		encryptedArray.set(iv);
+		encryptedArray.set(new Uint8Array(encryptedData), iv.length);
+
+		return btoa(String.fromCharCode(...encryptedArray));
+	}
+
+	// 秘密鍵の復号化
+	async decryptNsec(encrypted: string): Promise<string> {
+		try {
+			const encryptedData = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+			const iv = encryptedData.slice(0, 12);
+			const data = encryptedData.slice(12);
+
+			const keyMaterial = await crypto.subtle.importKey(
+				'raw',
+				new TextEncoder().encode("meow"),
+				'PBKDF2',
+				false,
+				['deriveBits', 'deriveKey']
+			);
+
+			const key = await crypto.subtle.deriveKey(
+				{
+					name: 'PBKDF2',
+					salt: new TextEncoder().encode('nostr-monitor-salt'),
+					iterations: 100000,
+					hash: 'SHA-256'
+				},
+				keyMaterial,
+				{ name: 'AES-GCM', length: 256 },
+				false,
+				['encrypt', 'decrypt']
+			);
+
+			const decryptedData = await crypto.subtle.decrypt(
+				{
+					name: 'AES-GCM',
+					iv: iv
+				},
+				key,
+				data
+			);
+
+			return new TextDecoder().decode(decryptedData);
+		} catch (error) {
+			console.error('Decryption failed:', error);
+			return '';
+		}
+	}
+	// 秘密鍵の設定（暗号化して保存）
+	async setNsec(nsec: string) {
+		if (nsec) {
+			try {
+				this.settings.encryptedNsec = await this.encryptNsec(nsec);
+				this.currentNsec = nsec;
+			} catch (error) {
+				console.error('Failed to encrypt nsec:', error);
+				new Notice('Failed to save secret key');
+				return false;
+			}
+		} else {
+			this.settings.encryptedNsec = undefined;
+			this.currentNsec = '';
+		}
+		await this.saveSettings();
+		return true;
+	}
+
+	// 現在の秘密鍵を取得
+	getNsec(): string {
+		return this.currentNsec;
+	}
 }
