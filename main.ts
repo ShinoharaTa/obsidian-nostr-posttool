@@ -2,6 +2,7 @@ import { Plugin, Notice } from 'obsidian';
 import { SimplePool } from "nostr-tools";
 import type { Filter, Event } from "nostr-tools";
 import 'websocket-polyfill';
+import { NostrSettingsTab } from 'settings';
 
 interface NostrClientSettings {
     relays: string[];
@@ -24,6 +25,8 @@ export default class NostrClientPlugin extends Plugin {
     async onload() {
         await this.loadSettings();
         this.pool = new SimplePool();
+		this.addSettingTab(new NostrSettingsTab(this.app, this));
+
         // プラグインが有効化されたときにNostrの監視を開始
         this.startMonitoring();
 
@@ -64,15 +67,15 @@ export default class NostrClientPlugin extends Plugin {
     handleNostrEvent(event: Event) {
         try {
             const content = event.content;
-            
+
             // 「テスト」という単語が含まれているかチェック
             if (this.settings.searchPattern.test(content)) {
                 // 投稿者の公開鍵を短縮形式で表示
-                const authorShort = event.pubkey.substring(0, 6) + '...';
-                
+                const authorShort = `${event.pubkey.substring(0, 6)}...`;
+
                 // 通知を表示
                 new Notice(`🔔 新しいNostrメッセージ\nAuthor: ${authorShort}\nContent: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`);
-                
+
                 // コンソールにも記録
                 console.log('Nostrイベント検知:', {
                     author: event.pubkey,
