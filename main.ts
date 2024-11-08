@@ -3,12 +3,12 @@ import { SimplePool } from "nostr-tools";
 import type { Filter, Event } from "nostr-tools";
 import 'websocket-polyfill';
 
-interface NostrMonitorSettings {
+interface NostrClientSettings {
     relays: string[];
     searchPattern: RegExp;
 }
 
-const DEFAULT_SETTINGS: NostrMonitorSettings = {
+const DEFAULT_SETTINGS: NostrClientSettings = {
     relays: [
         'wss://kojira.io',
         'wss://yabu.me',
@@ -17,8 +17,8 @@ const DEFAULT_SETTINGS: NostrMonitorSettings = {
     searchPattern: /ちんちん/
 };
 
-export default class NostrMonitorPlugin extends Plugin {
-    settings: NostrMonitorSettings;
+export default class NostrClientPlugin extends Plugin {
+    settings: NostrClientSettings;
     pool: SimplePool;
 
     async onload() {

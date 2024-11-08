@@ -1,10 +1,11 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
-import NostrMonitorPlugin from './main';
+import { PluginSettingTab, Setting } from 'obsidian';
+import type { App } from 'obsidian';
+import type NostrClientPlugin from './main';
 
 export class NostrSettingsTab extends PluginSettingTab {
-    plugin: NostrMonitorPlugin;
+    plugin: NostrClientPlugin;
 
-    constructor(app: App, plugin: NostrMonitorPlugin) {
+    constructor(app: App, plugin: NostrClientPlugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
@@ -13,7 +14,7 @@ export class NostrSettingsTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'Nostr Monitor Settings' });
+        containerEl.createEl('h2', { text: 'Nostr Client Settings' });
 
         // リレーの設定
         new Setting(containerEl)

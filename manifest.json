@@ -1,6 +1,6 @@
 {
-	"id": "obsidian-nostr-monitor",
-	"name": "Nostr Monitor",
+	"id": "obsidian-nostr-simple-client",
+	"name": "Nostr simple client",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Nostrのメッセージを監視して通知を表示するプラグイン",
