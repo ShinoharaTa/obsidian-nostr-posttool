@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS: NostrMonitorSettings = {
         'wss://yabu.me',
         'wss://relay-jp.shino3.net',
     ],
-    searchPattern: /にゃーん/
+    searchPattern: /ちんちん/
 };
 
 export default class NostrMonitorPlugin extends Plugin {
@@ -68,10 +68,10 @@ export default class NostrMonitorPlugin extends Plugin {
             // 「テスト」という単語が含まれているかチェック
             if (this.settings.searchPattern.test(content)) {
                 // 投稿者の公開鍵を短縮形式で表示
-                const authorShort = event.pubkey.substring(0, 8) + '...';
+                const authorShort = event.pubkey.substring(0, 6) + '...';
                 
                 // 通知を表示
-                new Notice(`🔔 新しいNostrメッセージ\n作者: ${authorShort}\n内容: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`);
+                new Notice(`🔔 新しいNostrメッセージ\nAuthor: ${authorShort}\nContent: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`);
                 
                 // コンソールにも記録
                 console.log('Nostrイベント検知:', {
