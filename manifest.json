@@ -1,0 +1,9 @@
+{
+	"id": "obsidian-nostr-monitor",
+	"name": "Nostr Monitor",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Nostrのメッセージを監視して通知を表示するプラグイン",
+	"author": "Shino3",
+	"isDesktopOnly": false
+}
